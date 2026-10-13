@@ -1,0 +1,9 @@
+commit-msg:
+  commands:
+    signoff-check:
+      run: git interpret-trailers --if-exists doNothing --trailer "Signed-off-by: {author}" --in-place "$1"
+      fail_text: "Commit message must include a Signed-off-by trailer"
+pre-commit:
+  commands:
+    lint:
+      run: pnpm check
