@@ -43,7 +43,7 @@ const RULES: TextRule[] = [
     severity: "blocker",
     regexes: [
       /wait\s+(to\s+be\s+|until).{0,30}assigned/i,
-      /must\s+be\s+assigned/i,
+      /must\s+(also\s+)?be\s+assigned/i,
       /request(ing)?\s+(an\s+)?assignment/i,
       /ask\s+to\s+be\s+assigned/i,
       /assigned\s+to\s+you\s+before/i,

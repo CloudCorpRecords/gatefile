@@ -109,6 +109,11 @@ async function cmdBadge(ref: string, args: string[]): Promise<void> {
 
 async function main(): Promise<void> {
   const [cmd, ref, ...rest] = process.argv.slice(2);
+  if (cmd === "mcp") {
+    // Start the MCP server (stdio); the module runs on import.
+    await import("./mcp.js");
+    return;
+  }
   if (!cmd || !ref) usage();
   try {
     if (cmd === "extract") await cmdExtract(ref, rest);

@@ -11,7 +11,7 @@ import { renderBadge } from "./badge.js";
 
 const RepoRef = z.string().describe("Repo in owner/repo form, e.g. shadcn-labs/pdfcn");
 
-const server = new McpServer({ name: "gatefile", version: "0.1.0" });
+const server = new McpServer({ name: "gatefile", version: "0.1.1" });
 
 server.tool(
   "extract_gates",

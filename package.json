@@ -1,1 +1,41 @@
-{"bin":{"gatefile":"dist/cli.js"},"dependencies":{"@modelcontextprotocol/sdk":"^1","zod":"^3"},"description":"Extract hidden contribution gates from repo docs into machine-readable contribution-gates.json","devDependencies":{"@types/node":"^20","tsx":"^4","typescript":"^5"},"engines":{"node":">=20"},"license":"MIT","name":"gatefile","private":false,"scripts":{"build":"tsc","dev":"tsx src/cli.ts","test":"tsx --test test/*.test.ts"},"type":"module","version":"0.1.0"}
+{
+  "bin": {
+    "gatefile": "dist/cli.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1",
+    "zod": "^3"
+  },
+  "description": "Extract hidden contribution gates from repo docs into machine-readable contribution-gates.json",
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsx": "^4",
+    "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "name": "@reneturcios/gatefile",
+  "private": false,
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "type": "module",
+  "version": "0.1.1",
+  "mcpName": "io.github.CloudCorpRecords/gatefile",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CloudCorpRecords/gatefile.git"
+  },
+  "homepage": "https://github.com/CloudCorpRecords/gatefile#readme",
+  "files": [
+    "dist",
+    "server.json"
+  ]
+}
