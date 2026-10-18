@@ -54,6 +54,22 @@ A contributor picks an issue, writes the code, opens the PR, and a bot closes it
 
 Severity: `blocker` gates can get a PR closed or rejected before review. `warn` gates can be fixed after the PR opens. Evidence is always a real quote from the source file, trimmed to about 140 characters, never invented.
 
+## Run it with Docker
+
+gatefile also ships as a container image on GHCR: `ghcr.io/cloudcorprecords/gatefile`.
+
+Use it as a stdio MCP server:
+
+```bash
+docker run -i ghcr.io/cloudcorprecords/gatefile
+```
+
+Any CLI command can be passed after the image name instead of the default `mcp` argument:
+
+```bash
+docker run ghcr.io/cloudcorprecords/gatefile <command> [args]
+```
+
 ## Usage
 
 ### CLI
