@@ -65,9 +65,11 @@ jobs:
           assert name and 'gatefile' in name.lower(), "unexpected server name: " + str(name)
           EOF
 
-          # 2. CLI still reachable: no-args prints usage and exits 2
+          # 2. CLI still reachable: an unknown command prints usage and exits 2
+          # (an explicit arg is required: with no args the image defaults to the
+          # MCP server, which would wait on stdin instead of printing usage)
           set +e
-          docker run --rm "$IMG" > usage.txt 2>&1
+          docker run --rm "$IMG" not-a-command > usage.txt 2>&1
           code=$?
           set -e
           grep -q "Usage" usage.txt
