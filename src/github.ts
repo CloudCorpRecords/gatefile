@@ -1,16 +1,28 @@
 /**
  * GitHub API fetcher for the files the extractor reads.
  * Native fetch, GITHUB_TOKEN optional (5000 req/hr authenticated).
+ * GATEFILE_GITHUB_BASE_URL (fallback GITHUB_BASE_URL) overrides the API
+ * base so the tool can run through a local proxy that attaches a stored
+ * token — the same pattern as Greenlight's GREENLIGHT_GITHUB_BASE_URL.
  */
 import { readdir, readFile, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { execFile } from "node:child_process";
+import { basename, join } from "node:path";
 import type { SourceFile } from "./extract.js";
 
-const API = "https://api.github.com";
+const DEFAULT_API = "https://api.github.com";
+
+/** The GitHub API base in use; trailing slashes are stripped. */
+export function githubApiBase(): string {
+  for (const raw of [process.env.GATEFILE_GITHUB_BASE_URL, process.env.GITHUB_BASE_URL]) {
+    if (raw && raw.trim().length > 0) return raw.trim().replace(/\/+$/, "");
+  }
+  return DEFAULT_API;
+}
 
 function headers(): Record<string, string> {
   const h: Record<string, string> = {
-    "User-Agent": "gatefile/0.1.0",
+    "User-Agent": "gatefile/0.1.2",
     Accept: "application/vnd.github+json",
   };
   if (process.env.GITHUB_TOKEN) h.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
@@ -34,6 +46,29 @@ export const CANDIDATE_PATHS = [
   ".github/CLA.md",
 ];
 
+/** Directories that hold candidate files (used for case-insensitive discovery). */
+const CANDIDATE_DIRS = ["", ".github", "docs", "docs/development", ".github/PULL_REQUEST_TEMPLATE"];
+
+/**
+ * Match candidate paths against the paths that actually exist, comparing
+ * case-insensitively (PT-4): a repo whose contributing file is lowercase
+ * `contributing.md` must be discovered just like `CONTRIBUTING.md`.
+ * Returns the real (on-disk / in-repo) paths in candidate priority order.
+ */
+export function matchCandidatePaths(available: string[]): string[] {
+  const byLower = new Map<string, string>();
+  for (const p of available) {
+    const key = p.toLowerCase();
+    if (!byLower.has(key)) byLower.set(key, p);
+  }
+  const matched: string[] = [];
+  for (const candidate of CANDIDATE_PATHS) {
+    const real = byLower.get(candidate.toLowerCase());
+    if (real && !matched.includes(real)) matched.push(real);
+  }
+  return matched;
+}
+
 interface ContentEntry {
   type: string;
   name: string;
@@ -41,7 +76,7 @@ interface ContentEntry {
 }
 
 async function getDefaultBranch(owner: string, repo: string): Promise<string> {
-  const res = await fetch(`${API}/repos/${owner}/${repo}`, { headers: headers() });
+  const res = await fetch(`${githubApiBase()}/repos/${owner}/${repo}`, { headers: headers() });
   if (!res.ok) throw new Error(`GitHub API ${res.status}: could not load ${owner}/${repo}`);
   const data = (await res.json()) as { default_branch?: string };
   return data.default_branch ?? "main";
@@ -56,7 +91,7 @@ async function fetchRaw(owner: string, repo: string, branch: string, path: strin
 }
 
 async function listDir(owner: string, repo: string, dir: string): Promise<ContentEntry[]> {
-  const res = await fetch(`${API}/repos/${owner}/${repo}/contents/${dir}`, { headers: headers() });
+  const res = await fetch(`${githubApiBase()}/repos/${owner}/${repo}/contents/${dir}`, { headers: headers() });
   if (!res.ok) return [];
   const data = (await res.json()) as ContentEntry[] | { message: string };
   return Array.isArray(data) ? data : [];
@@ -65,12 +100,27 @@ async function listDir(owner: string, repo: string, dir: string): Promise<Conten
 /**
  * Fetch every file the extractor understands from a GitHub repo.
  * Missing files are simply skipped, so permissive repos yield few sources.
+ * Candidate discovery is case-insensitive: the candidate directories are
+ * listed and matched without regard to case before fetching.
  */
 export async function fetchRepoFiles(owner: string, repo: string): Promise<SourceFile[]> {
   const branch = await getDefaultBranch(owner, repo);
   const files: SourceFile[] = [];
 
+  const available: string[] = [];
+  for (const dir of CANDIDATE_DIRS) {
+    for (const entry of await listDir(owner, repo, dir)) {
+      if (entry.type === "file") available.push(entry.path);
+    }
+  }
+  for (const path of matchCandidatePaths(available)) {
+    const content = await fetchRaw(owner, repo, branch, path);
+    if (content !== undefined) files.push({ path, content });
+  }
+  // Fallback for candidates in directories the listing did not cover.
   for (const path of CANDIDATE_PATHS) {
+    if (files.some((f) => f.path === path)) continue;
+    if (available.some((a) => a.toLowerCase() === path.toLowerCase())) continue;
     const content = await fetchRaw(owner, repo, branch, path);
     if (content !== undefined) files.push({ path, content });
   }
@@ -91,11 +141,12 @@ export async function fetchRepoFiles(owner: string, repo: string): Promise<Sourc
 
 /**
  * Offline mode: read the same candidate files plus workflow/lefthook configs
- * from a local directory.
+ * from a local directory. Candidate discovery is case-insensitive, matching
+ * the API mode (PT-4).
  */
 export async function readLocalFiles(dir: string): Promise<SourceFile[]> {
   const files: SourceFile[] = [];
-  const tryRead = async (path: string): Promise<void> => {
+  const push = async (path: string): Promise<void> => {
     try {
       const content = await readFile(join(dir, path), "utf8");
       files.push({ path, content });
@@ -104,7 +155,24 @@ export async function readLocalFiles(dir: string): Promise<SourceFile[]> {
     }
   };
 
-  for (const path of CANDIDATE_PATHS) await tryRead(path);
+  const available: string[] = [];
+  for (const sub of CANDIDATE_DIRS) {
+    let names: string[] = [];
+    try {
+      const st = await stat(join(dir, sub));
+      if (st.isDirectory()) names = await readdir(join(dir, sub));
+    } catch {
+      continue;
+    }
+    for (const name of names) available.push(sub ? `${sub}/${name}` : name);
+  }
+  for (const path of matchCandidatePaths(available)) await push(path);
+  // Fallback: exact-case candidates in directories that were not listable.
+  for (const path of CANDIDATE_PATHS) {
+    if (files.some((f) => f.path === path)) continue;
+    if (available.some((a) => a.toLowerCase() === path.toLowerCase())) continue;
+    await push(path);
+  }
 
   for (const sub of [".github/ISSUE_TEMPLATE", ".github/workflows"]) {
     let names: string[] = [];
@@ -118,9 +186,30 @@ export async function readLocalFiles(dir: string): Promise<SourceFile[]> {
       if (!/\.(md|ya?ml)$/i.test(name)) continue;
       const path = `${sub}/${name}`;
       if (files.some((f) => f.path === path)) continue;
-      await tryRead(path);
+      await push(path);
     }
   }
 
   return files;
+}
+
+/**
+ * The `repo` label for a local run (PT-7): never a filesystem path.
+ * Prefers a valid owner/repo argument, then the checkout's git origin
+ * remote, then a clean `local/<dirname>` identifier.
+ */
+export async function localRepoLabel(dir: string, refArg?: string): Promise<string> {
+  if (refArg && /^[^/\s]+\/[^/\s]+$/.test(refArg.trim())) return refArg.trim();
+  try {
+    const url = await new Promise<string>((resolve, reject) => {
+      execFile("git", ["-C", dir, "remote", "get-url", "origin"], { timeout: 5000 }, (err, stdout) =>
+        err ? reject(err) : resolve(String(stdout).trim())
+      );
+    });
+    const m = /github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?$/.exec(url);
+    if (m) return `${m[1]}/${m[2]}`;
+  } catch {
+    /* not a git checkout: fall through */
+  }
+  return `local/${basename(dir.replace(/\/+$/, "")) || "repo"}`;
 }

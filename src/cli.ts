@@ -12,7 +12,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { extractGates } from "./extract.js";
 import { validateGatesFile, parseGatesFile } from "./validate.js";
-import { fetchRepoFiles, readLocalFiles } from "./github.js";
+import { fetchRepoFiles, readLocalFiles, localRepoLabel } from "./github.js";
 import { renderBadge } from "./badge.js";
 import type { GatesFile } from "./types.js";
 
@@ -42,7 +42,8 @@ function has(args: string[], name: string): boolean {
 async function loadFiles(ref: string, localDir: string | undefined) {
   if (localDir) {
     const files = await readLocalFiles(localDir);
-    return { ref: localDir, files };
+    // PT-7: the repo field is an owner/repo label, never a filesystem path.
+    return { ref: await localRepoLabel(localDir, ref), files };
   }
   const { owner, repo } = parseRepoRef(ref);
   const files = await fetchRepoFiles(owner, repo);

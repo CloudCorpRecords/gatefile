@@ -1,6 +1,11 @@
 # Changelog
 
 
+## 0.1.2 (2026-10-23)
+
+Real 0.1.2 release (the MCP Registry previously carried a phantom 0.1.2 entry pointing at the 0.1.1 packages). Fixes from production validation: contributing-file discovery is now case-insensitive in both API and `--local` modes, so a lowercase `contributing.md` (e.g. usebruno/bruno) is listed in `generatedFrom` and actually scanned (PT-4); `--local` no longer puts a filesystem path in the `repo` field — it uses the owner/repo argument or the checkout's git origin, else a clean `local/<name>` identifier (PT-7); GitHub API base URL can be overridden with `GATEFILE_GITHUB_BASE_URL` (fallback `GITHUB_BASE_URL`) so the tool can run through a local proxy (PT-1). 32 tests passing.
+
+
 ## 0.1.1 (2026-10-15)
 
 Ships on npm as @reneturcios/gatefile and in the official MCP Registry.
