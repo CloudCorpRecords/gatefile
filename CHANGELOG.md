@@ -1,6 +1,11 @@
 # Changelog
 
 
+## 0.1.3 (2026-10-23)
+
+Fix found by the 0.1.2 production re-verification: in API mode, file contents were fetched from raw.githubusercontent.com with the GITHUB_TOKEN attached — under the gh-proxy pattern (`GITHUB_TOKEN=proxy`) the raw host answers 404 to the placeholder token, so API mode silently returned zero files. Contents are now fetched through the GitHub API (raw media type), so the base-URL override applies to content as well and no token is sent to a non-API host. As a fresh registry version, 0.1.3 also fully supersedes the phantom 0.1.2 registry entry (whose package pointers still named 0.1.1 and could not be edited: the registry forbids duplicate publishes and its PUT edit endpoint rejects the OIDC publishing identity).
+
+
 ## 0.1.2 (2026-10-23)
 
 Real 0.1.2 release (the MCP Registry previously carried a phantom 0.1.2 entry pointing at the 0.1.1 packages). Fixes from production validation: contributing-file discovery is now case-insensitive in both API and `--local` modes, so a lowercase `contributing.md` (e.g. usebruno/bruno) is listed in `generatedFrom` and actually scanned (PT-4); `--local` no longer puts a filesystem path in the `repo` field — it uses the owner/repo argument or the checkout's git origin, else a clean `local/<name>` identifier (PT-7); GitHub API base URL can be overridden with `GATEFILE_GITHUB_BASE_URL` (fallback `GITHUB_BASE_URL`) so the tool can run through a local proxy (PT-1). 32 tests passing.

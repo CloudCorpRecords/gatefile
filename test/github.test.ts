@@ -97,6 +97,15 @@ describe("case-insensitive contributing discovery (PT-4)", () => {
       if (u.includes("/repos/o/r") && !u.includes("/contents/")) return json({ default_branch: "main" });
       if (u.includes("/contents/")) {
         const dirPath = decodeURIComponent(u.split("/contents/")[1] ?? "");
+        if (dirPath.startsWith("contributing.md")) {
+          return {
+            ok: true,
+            status: 200,
+            headers: { get: () => null },
+            json: async () => ({}),
+            text: async () => "Sign the Contributor License Agreement first.\n",
+          };
+        }
         if (dirPath === "") {
           return json([
             { type: "file", name: "contributing.md", path: "contributing.md" },
@@ -106,17 +115,19 @@ describe("case-insensitive contributing discovery (PT-4)", () => {
         }
         return json([]);
       }
+      if (u.includes("/contents/contributing.md")) {
+        return {
+          ok: true,
+          status: 200,
+          headers: { get: () => null },
+          json: async () => ({}),
+          text: async () => "Sign the Contributor License Agreement first.\n",
+        };
+      }
       if (u.includes("raw.githubusercontent.com")) {
-        if (u.endsWith("/contributing.md")) {
-          return {
-            ok: true,
-            status: 200,
-            headers: { get: () => null },
-            json: async () => ({}),
-            text: async () => "Sign the Contributor License Agreement first.\n",
-          };
-        }
-        return { ok: false, status: 404, headers: { get: () => null }, json: async () => ({}), text: async () => "not found" };
+        // Regression guard (0.1.3): content must come through the API so a
+        // placeholder proxy token is never sent to the raw host (it 404s).
+        throw new Error("raw.githubusercontent.com must not be used for repo content");
       }
       throw new Error(`unexpected fetch: ${u}`);
     }) as typeof fetch;

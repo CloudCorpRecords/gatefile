@@ -22,7 +22,7 @@ export function githubApiBase(): string {
 
 function headers(): Record<string, string> {
   const h: Record<string, string> = {
-    "User-Agent": "gatefile/0.1.2",
+    "User-Agent": "gatefile/0.1.3",
     Accept: "application/vnd.github+json",
   };
   if (process.env.GITHUB_TOKEN) h.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
@@ -83,9 +83,20 @@ async function getDefaultBranch(owner: string, repo: string): Promise<string> {
 }
 
 async function fetchRaw(owner: string, repo: string, branch: string, path: string): Promise<string | undefined> {
-  const res = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`, {
-    headers: process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {},
-  });
+  // Fetch content through the API (raw media type), not raw.githubusercontent:
+  // the base-URL override then applies to content too, and a placeholder
+  // proxy token (GITHUB_TOKEN=proxy) is never sent to the raw host — it
+  // answers 404 to an Authorization header it cannot validate (0.1.3 fix).
+  try {
+    const res = await fetch(
+      `${githubApiBase()}/repos/${owner}/${repo}/contents/${path}?ref=${encodeURIComponent(branch)}`,
+      { headers: { ...headers(), Accept: "application/vnd.github.raw+json" } }
+    );
+    if (res.ok) return res.text();
+  } catch {
+    /* fall through to the direct raw host */
+  }
+  const res = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`);
   if (!res.ok) return undefined;
   return res.text();
 }
